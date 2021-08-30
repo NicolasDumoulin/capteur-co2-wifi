@@ -16,8 +16,8 @@ const char MAIN_page[] PROGMEM = R"=====(
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Disable favico -->
     <link rel="icon" href="data:,">
-    <script src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.5.0/chart.js"></script>
-    <!--script src = "/chart.js"></script-->
+    <!--script src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.5.0/chart.js"></script-->
+    <script src = "/chart.js"></script>
     <style>
       canvas{ -moz-user-select: none; -webkit-user-select: none; -ms-user-select: none; }
       html { font-family: Arial; display: inline-block; margin: 0px auto; text-align: center; }
