@@ -1,7 +1,4 @@
-#include <SPI.h>
-#include <WiFiNINA.h>
-#include "Webpageindex.h"
-#include "chart.js.h"
+#include "webserver.h"
 
 /**
  * Initialisation du Wifi
@@ -26,7 +23,7 @@ int initWifi(const char* ssid, const char* password, const char* failbackAPssid,
     Serial.print("Tentative de connexion au SSID : ");
     Serial.println(ssid);
     // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
-    status = WiFi.begin(ssid, pass);
+    status = WiFi.begin(ssid, password);
     // wait 3 seconds for connection:
     for (int i=0; i < wifilocal_attempts_wait; i++) {
       digitalWrite(LEDR,HIGH);
@@ -36,7 +33,7 @@ int initWifi(const char* ssid, const char* password, const char* failbackAPssid,
     }
     attempts++;
   }
-  if (attempts == wifilocal_nb_attempts) {
+  if ((status != WL_CONNECTED) && (attempts == wifilocal_nb_attempts)) {
     Serial.println("Échec de la connexion. Démarrage en mode Point d'Accès.");
     status = initWifiAP(failbackAPssid, failbackAPpassword);
   }
@@ -101,9 +98,21 @@ void printContentLineByLine(WiFiClient* client, const char* content) {
   const char **p = &content;
   while(NULL!=sgets(buff, sizeof(buff), p))
       client->print(buff);
+  /*char widebuffer[25500] {'\0'};
+  strcpy_P(widebuffer, PSTR(content));
+  char buffer[255] = {0};
+  size_t len = strlen(widebuffer);      // doesn't count terminator
+  size_t blen = sizeof(buffer)-1; // doesn't count terminator
+  size_t i = 0;
+  // the actual loop that enumerates your buffer
+  for (i=0; i<len/blen; ++i) {
+      memcpy(buffer, widebuffer + (i*blen), blen);
+      client->print(buffer);
+  }
+  // if there is anything left over
+  if (len % blen)
+      client->print(widebuffer + (len - len % blen));*/
 }
-
-enum class Request {INDEX_HTML, DATA, CONFIG_GET, CONFIG_POST, CHARTJS};
 
 int cstringEndsWith(const char *str, const char *suffix) {
     size_t lenstr = strlen(str);
@@ -128,35 +137,28 @@ String split(String data, char separator, int index) {
   return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
-void serveWeb(WiFiServer* server, float co2, float temp, float humidity, int* updateIntervall, int* altitude) {
+void serveWeb(WiFiServer* server, SCD30* airSensor, float co2, float temp, float humidity, int* updateIntervall, int* altitude, bool* ledON) {
   WiFiClient client = server->available();
   if (client) {                             // if you get a client,
     String currentLine = "";                // make a String to hold incoming data from the client
-    //char* currentLine = new char[50];                
-    //int currentLinePos = 0;
     Request request = Request::INDEX_HTML;
     while (client.connected()) {            // loop while the client's connected
       if (client.available()) {             // if there's bytes to read from the client,
         char c = client.read();             // read a byte, then
         Serial.write(c);                    // print it out the serial monitor
         if (currentLine.endsWith("GET /data")) {
-        //if (cstringEndsWith(currentLine, "GET /data")) {
           request = Request::DATA;
         } else if (currentLine.endsWith("GET /config")) {
-        //} else if (cstringEndsWith(currentLine, "GET /config")) {
-          request = Request::CONFIG_GET;
+         request = Request::CONFIG_GET;
         } else if (currentLine.endsWith("POST /config")) {
-        //} else if (cstringEndsWith(currentLine, "POST /config")) {
           request = Request::CONFIG_POST;
         } else if (currentLine.endsWith("GET /chart.js")) {
-        //} else if (cstringEndsWith(currentLine, "GET /chart.js")) {
           request = Request::CHARTJS;
         }
         if (c == '\n') {                    // if the byte is a newline character
           // if the current line is blank, you got two newline characters in a row.
           // that's the end of the client HTTP request, so send a response:
           if (currentLine.length() == 0) {
-          //if (strlen(currentLine) == 0) {
             // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
             // and a content-type so the client knows what's coming, then a blank line:
             client.println("HTTP/1.1 200 OK");
@@ -169,9 +171,9 @@ void serveWeb(WiFiServer* server, float co2, float temp, float humidity, int* up
                + "\", \"Humidity\":\"" + String(humidity) + "\"}";
               printContentLineByLine(&client, data2send.c_str());
             } else if (request == Request::CONFIG_GET) {
-              String data2send = "{\"updateIntervall\":\"" + String(*updateIntervall) + "\""
-                  +",\"altitude\":\"" + String(*altitude) + "\""
-                  + "}";
+              String data2send = "{\"updateIntervall\":\"" + String(*updateIntervall)
+                  +"\",\"altitude\":\"" + String(*altitude) +"\",\"ledON\":\"" + String(*ledON)
+                  + "\"}";
               printContentLineByLine(&client, data2send.c_str());
             } else if (request == Request::CONFIG_POST) {
               // lecture de la ligne de données POST jusqu'au caractère "/" (à envoyer ainsi depuis la requête)
@@ -192,17 +194,21 @@ void serveWeb(WiFiServer* server, float co2, float temp, float humidity, int* up
                 if (postvariable == "updateIntervall") {
                   if (*updateIntervall != postvalue.toInt()) {
                     *updateIntervall = postvalue.toInt();
-                    airSensor.setMeasurementInterval(*updateIntervall);
+                    airSensor->setMeasurementInterval(*updateIntervall);
                     Serial.print("Variable updateIntervall mise à jour avec : ");
                     Serial.println(postvalue);
                   }
                 } else if (postvariable == "altitude") {
                   if (*altitude != postvalue.toInt()) {
                     *altitude = postvalue.toInt();
-                    airSensor.setAltitudeCompensation(*altitude);
+                    airSensor->setAltitudeCompensation(*altitude);
                     Serial.print("Variable altitude mise à jour avec : ");
                     Serial.println(postvalue);
                   }
+                } else if (postvariable == "ledON") {
+                  *ledON = (postvalue == "1");
+                  Serial.print("Variable ledON mise à jour avec : ");
+                  Serial.println( (postvalue == "1"));
                 }
               }
               // TODO read POST data and update interval in main
@@ -216,12 +222,9 @@ void serveWeb(WiFiServer* server, float co2, float temp, float humidity, int* up
             // break out of the while loop:
             break;
           } else {    // if you got a newline, then clear currentLine:
-            //currentLinePos = 0;
-            //memset(&currentLine[0], 0, sizeof(currentLine));
             currentLine = "";
           }
         } else if (c != '\r') {  // if you got anything else but a carriage return character,
-          //currentLine[currentLinePos++] = c;
           currentLine += c;      // add it to the end of the currentLine
         }
       }

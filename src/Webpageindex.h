@@ -45,6 +45,8 @@ const char MAIN_page[] PROGMEM = R"=====(
           <input type="text" id="finterval" name="finterval"><br>
           <label for="faltitude">Altitude (mètres)</label><br>
           <input type="text" id="faltitude" name="faltitude"><br>
+          <label for="fledon">LED</label><br>
+          <input type="text" id="fledon" name="fledon"><br>
           <button type="button" id="config-cancel">Annuler</button>
           <input type="submit" value="Valider">
         </form>
@@ -96,7 +98,7 @@ const char MAIN_page[] PROGMEM = R"=====(
     var maxArrayLength  = 1000;
 
     // update intervall for getting new data in milliseconds
-    updateIntervall = 2;
+    updateIntervall = 20;
     document.getElementById('finterval').value = updateIntervall;
     // fetch config value from the sensor and store value in updateIntervall
     getConfig();
@@ -265,12 +267,13 @@ const char MAIN_page[] PROGMEM = R"=====(
       var xhttp = new XMLHttpRequest();
       // onreadystatechange property defines a function to be executed when the readyState changes
       xhttp.onreadystatechange = function() {
-        if (this.readyState == 4 && this.status == 200) {
-          var txt = this.responseText;
+        if (xhttp.readyState == 4 && xhttp.status == 200) {
+          var txt = xhttp.responseText;
           var obj = JSON.parse(txt);
           updateIntervall = obj.updateIntervall;
           document.getElementById('finterval').value = updateIntervall;
           document.getElementById('faltitude').value = obj.altitude;
+          document.getElementById('fledon').value = obj.ledON;
         }
       };
       xhttp.open("GET", "config", true);
@@ -279,12 +282,11 @@ const char MAIN_page[] PROGMEM = R"=====(
 
     // Update config and store configuration with ajax script
     function storeConfig(form) {
-      updateIntervall = parseInt(form["finterval"].value);
-      console.log("storeConfig updateIntervall = ",updateIntervall);
+      console.log("storeConfig fledon = ", parseInt(form["fledon"].value));
       var http = new XMLHttpRequest();
       var url = 'config';
       var params = 'updateIntervall='+form["finterval"].value
-        +',altitude='+form["faltitude"].value+'/';
+        +',altitude='+form["faltitude"].value+',ledON='+form["fledon"].value+'/';
       http.open('POST', url, true);
       // onreadystatechange property defines a function to be executed when the readyState changes
       http.onreadystatechange = function() {

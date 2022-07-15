@@ -1,2 +1,4 @@
-wifi_credentials.h
+src/wifi_credentials.h
+.pio
+.vscode
 
