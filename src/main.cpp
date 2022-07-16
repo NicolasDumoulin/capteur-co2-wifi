@@ -2,7 +2,8 @@
 
 #include <WiFiNINA.h>
 #include "SparkFun_SCD30_Arduino_Library.h"
-#include <LittleFS_Mbed_RP2040.h>
+#include <LittleFS.h>
+#include "config.h"
 #include "filestorage.h"
 #include "webserver.h"
 
@@ -15,19 +16,13 @@ const int wifilocal_attempts_wait = 5; // temps d'attente (secondes) entre chaqu
 //char pass[] = "wifiPass";    // Wifi Mot de passe
 //char ssidAP[] = "APwifiSSID";        // AP SSID
 //char passAP[] = "APwifiSSID"";    // AP Mot de passe
-/************** CO2 Sensor config **************/
-const int level_medium = 700;
-const int level_high = 1000;
-int co2MeasurementInterval = 20;
-int co2AltitudeCompensation = 393; // Beaumont, 63
 /************** Variables **************/
-LittleFS_MBED *myFS;
+configStruct config;
 WiFiServer server(80);
 SCD30 airSensor;
 float co2 = 0.0, temp = 0.0, humidity = 0.0;
 int timestep = 0;
 char timestamp[] = "";
-bool ledON = true;
 
 void setup() {
   Serial.begin(9600);
@@ -55,16 +50,20 @@ void setup() {
     }
   };
   // initialise le stockage
-  myFS = new LittleFS_MBED();
-  if (!myFS->init()) {
+  if (!LittleFS.begin()) {
     Serial.println("Échec de l'initialisation de LITTLEFS");
     while (1);
   }
-  // TODO read config from file (if present)
-  readConfig();
+  config.level_medium = 700;
+  config.level_high = 1000;
+  config.co2MeasurementInterval = 20;
+  config.co2AltitudeCompensation = 393; // Beaumont, 63
+  config.ledON = true;
+  // TODO store config if file not present
+  readConfig(&config);
   readData();
-  airSensor.setMeasurementInterval(co2MeasurementInterval);
-  airSensor.setAltitudeCompensation(co2AltitudeCompensation);
+  airSensor.setMeasurementInterval(config.co2MeasurementInterval);
+  airSensor.setAltitudeCompensation(config.co2AltitudeCompensation);
   int status = initWifi(ssid, pass, ssidAP, passAP, wifilocal_nb_attempts, wifilocal_attempts_wait);
   server.begin();
   // TODO backport this call or delete ?
@@ -83,10 +82,10 @@ void loop() {
     Serial.print(" / humidité(%) : ");
     Serial.print(humidity, 1);
     Serial.println();
-    if (ledON) {
-      digitalWrite(LEDR, co2 > level_medium ? HIGH : LOW);
-      digitalWrite(LEDG, co2 < level_medium && co2 > 0.0 ? HIGH : LOW);
-      digitalWrite(LEDB, co2 > level_medium && co2 < level_high ? HIGH : LOW);
+    if (config.ledON) {
+      digitalWrite(LEDR, co2 > config.level_medium ? HIGH : LOW);
+      digitalWrite(LEDG, co2 < config.level_medium && co2 > 0.0 ? HIGH : LOW);
+      digitalWrite(LEDB, co2 > config.level_medium && co2 < config.level_high ? HIGH : LOW);
     } else {
       digitalWrite(LEDG, LOW);
       digitalWrite(LEDR, LOW);
@@ -95,8 +94,8 @@ void loop() {
     storeData(timestep, timestamp, co2, temp, humidity);
     timestep++;
     // On attend le temps nécessaire à la prochaine acquisition de données et on écoute les requêtes web pendant ce temps.
-    for (int i=0; i<co2MeasurementInterval*100;i++) {
-      serveWeb(&server, &airSensor, co2, temp, humidity, &co2MeasurementInterval, &co2AltitudeCompensation, &ledON);
+    for (int i=0; i<config.co2MeasurementInterval*100;i++) {
+      serveWeb(&server, &airSensor, co2, temp, humidity, &config);
       delay(10);
     }
   } else {
@@ -105,18 +104,18 @@ void loop() {
     digitalWrite(LEDB, LOW);
     Serial.println("En attente de nouvelles données");
     delay(100);
-    if (ledON) {
-      digitalWrite(LEDR, co2 > level_medium ? HIGH : LOW);
-      digitalWrite(LEDG, co2 < level_medium && co2 > 0.0 ? HIGH : LOW);
-      digitalWrite(LEDB, co2 > level_medium && co2 < level_high ? HIGH : LOW);
+    if (config.ledON) {
+      digitalWrite(LEDR, co2 > config.level_medium ? HIGH : LOW);
+      digitalWrite(LEDG, co2 < config.level_medium && co2 > 0.0 ? HIGH : LOW);
+      digitalWrite(LEDB, co2 > config.level_medium && co2 < config.level_high ? HIGH : LOW);
       delay(400);
       digitalWrite(LEDG, LOW);
       digitalWrite(LEDR, LOW);
       digitalWrite(LEDB, LOW);
       delay(100);
-      digitalWrite(LEDR, co2 > level_medium ? HIGH : LOW);
-      digitalWrite(LEDG, co2 < level_medium && co2 > 0.0 ? HIGH : LOW);
-      digitalWrite(LEDB, co2 > level_medium && co2 < level_high ? HIGH : LOW);
+      digitalWrite(LEDR, co2 > config.level_medium ? HIGH : LOW);
+      digitalWrite(LEDG, co2 < config.level_medium && co2 > 0.0 ? HIGH : LOW);
+      digitalWrite(LEDB, co2 > config.level_medium && co2 < config.level_high ? HIGH : LOW);
     } else {
       delay(500);
     }

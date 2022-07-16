@@ -137,7 +137,7 @@ String split(String data, char separator, int index) {
   return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
-void serveWeb(WiFiServer* server, SCD30* airSensor, float co2, float temp, float humidity, int* updateIntervall, int* altitude, bool* ledON) {
+void serveWeb(WiFiServer* server, SCD30* airSensor, float co2, float temp, float humidity, configStruct* config) {
   WiFiClient client = server->available();
   if (client) {                             // if you get a client,
     String currentLine = "";                // make a String to hold incoming data from the client
@@ -171,8 +171,8 @@ void serveWeb(WiFiServer* server, SCD30* airSensor, float co2, float temp, float
                + "\", \"Humidity\":\"" + String(humidity) + "\"}";
               printContentLineByLine(&client, data2send.c_str());
             } else if (request == Request::CONFIG_GET) {
-              String data2send = "{\"updateIntervall\":\"" + String(*updateIntervall)
-                  +"\",\"altitude\":\"" + String(*altitude) +"\",\"ledON\":\"" + String(*ledON)
+              String data2send = "{\"updateIntervall\":\"" + String(config->co2MeasurementInterval)
+                  +"\",\"altitude\":\"" + String(config->co2AltitudeCompensation) +"\",\"ledON\":\"" + String(config->ledON)
                   + "\"}";
               printContentLineByLine(&client, data2send.c_str());
             } else if (request == Request::CONFIG_POST) {
@@ -192,21 +192,21 @@ void serveWeb(WiFiServer* server, SCD30* airSensor, float co2, float temp, float
                 postvariable = split(postelt,'=',0);
                 postvalue = split(postelt,'=',1);
                 if (postvariable == "updateIntervall") {
-                  if (*updateIntervall != postvalue.toInt()) {
-                    *updateIntervall = postvalue.toInt();
-                    airSensor->setMeasurementInterval(*updateIntervall);
+                  if (config->co2MeasurementInterval != postvalue.toInt()) {
+                    config->co2MeasurementInterval = postvalue.toInt();
+                    airSensor->setMeasurementInterval(config->co2MeasurementInterval);
                     Serial.print("Variable updateIntervall mise à jour avec : ");
                     Serial.println(postvalue);
                   }
                 } else if (postvariable == "altitude") {
-                  if (*altitude != postvalue.toInt()) {
-                    *altitude = postvalue.toInt();
-                    airSensor->setAltitudeCompensation(*altitude);
+                  if (config->co2AltitudeCompensation != postvalue.toInt()) {
+                    config->co2AltitudeCompensation = postvalue.toInt();
+                    airSensor->setAltitudeCompensation(config->co2AltitudeCompensation);
                     Serial.print("Variable altitude mise à jour avec : ");
                     Serial.println(postvalue);
                   }
                 } else if (postvariable == "ledON") {
-                  *ledON = (postvalue == "1");
+                  config->ledON = (postvalue == "1");
                   Serial.print("Variable ledON mise à jour avec : ");
                   Serial.println( (postvalue == "1"));
                 }

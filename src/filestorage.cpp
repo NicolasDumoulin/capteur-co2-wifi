@@ -1,22 +1,34 @@
-#include <Arduino.h>
+#include "filestorage.h"
 
 // TODO implements functions
 
 void storeData(int timestep, const char* timestamp, float co2, float temp, float humidity) {
-  //char line[32];
-  //snprintf(line, sizeof(line), "%d,%s,%f,%f,%f\n", timestep, timestamp, co2, temp, humidity);
-  //appendFile(DATA_PATH, line);
+  char line[32];
+  snprintf(line, sizeof(line), "%d,%s,%f,%f,%f\n", timestep, timestamp, co2, temp, humidity);
+  File file = LittleFS.open(DATA_PATH, "a");
+  file.print(line);
+  delay(1);
+  file.close();
 }
 
-void storeConfig(int updateIntervall, int level_medium, int level_high, int co2AltitudeCompensation) {
-  //char line[64];
-  //snprintf(line, sizeof(line), "%d\n%d\n%d\n%d\n", updateIntervall, level_medium, level_high, co2AltitudeCompensation);
-  //writeFile(DATA_PATH, line);
+void storeConfig(configStruct config) {
+  char line[64];
+  snprintf(line, sizeof(line), "%d\n%d\n%d\n%d\n%s\n", config.co2MeasurementInterval, config.level_medium,
+    config.level_high, config.co2AltitudeCompensation, config.ledON ? "true" : "false");
+  File file = LittleFS.open(CONFIG_PATH, "w");
+  file.print(line);
+  delay(1);
+  file.close();
 }
 
-void readConfig() {
+void readConfig(configStruct* config) {
   Serial.println("Read Config");
-  //readFile(CONFIG_PATH);
+  File file = LittleFS.open(CONFIG_PATH, "r");
+  config->co2MeasurementInterval = file.readStringUntil('\n').toInt();
+  config->level_medium = file.readStringUntil('\n').toInt();
+  config->level_high = file.readStringUntil('\n').toInt();
+  config->co2AltitudeCompensation = file.readStringUntil('\n').toInt();
+  config->ledON = file.readStringUntil('\n') == "true";
 }
 
 void readData() {

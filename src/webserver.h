@@ -1,5 +1,6 @@
 #include <SPI.h>
 #include <WiFiNINA.h>
+#include "config.h"
 #include "Webpageindex.h"
 #include "chart.js.h"
 #include "SparkFun_SCD30_Arduino_Library.h"
@@ -25,5 +26,5 @@ int cstringEndsWith(const char *str, const char *suffix);
 // https://stackoverflow.com/questions/9072320/split-string-into-string-array
 String split(String data, char separator, int index);
 
-void serveWeb(WiFiServer* server, SCD30* airSensor, float co2, float temp, float humidity, int* updateIntervall, int* altitude, bool* ledON);
+void serveWeb(WiFiServer* server, SCD30* airSensor, float co2, float temp, float humidity, configStruct* config);
 
